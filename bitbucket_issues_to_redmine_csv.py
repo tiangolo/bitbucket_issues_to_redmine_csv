@@ -152,10 +152,5 @@ if __name__ == '__main__':
     file_out = args.file_out
     user_map = args.user_map
 
-    # TODO remove this, only for debugging
-    file_in_ = file_in
-    file_out_ = file_out
-    user_map_ = user_map
-
     # Main program
     main(file_in, file_out, user_map)
