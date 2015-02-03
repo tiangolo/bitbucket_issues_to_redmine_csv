@@ -17,4 +17,14 @@ example:
      username, user.name
      anotheruser, redmine_another_user
      sameusername, sameusername
+     
+     
+Usage:
+------
 
+* Download a zip file with the issues of a Bitbucket project.
+* Unzip that file to some directory.
+* Create a mapping CSV file with the syntax described above for your users.
+* Download the file ``bitbucket_issues_to_redmine_csv.py`` from this repository.
+* Run the program as:
+``python download_directory/bitbucket_issues_to_redmine_csv.py json_directory/db-1.0.json csv_output_directory/csv_name.csv --user-map user_map_directory/user_map.csv``
