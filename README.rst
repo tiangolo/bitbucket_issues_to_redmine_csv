@@ -13,9 +13,7 @@ Use the latest version of the plug-in from: https://github.com/zh/redmine_import
 If the names of the users in Bitbucket are different from the names of the users in Redmine, it can use a mapping file:
 a CSV file with one column with the username from Bitbucket and another column with the username from Redmine, for
 example:
-
-:
-
+::
      username, user.name
      anotheruser, redmine_another_user
      sameusername, sameusername
