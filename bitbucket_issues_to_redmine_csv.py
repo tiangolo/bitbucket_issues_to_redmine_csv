@@ -58,39 +58,57 @@ def get_user_dict_function(user_map_):
         if user_dict is None:
             return username
         else:
-            return user_dict[username]
+            return user_dict.get(username, '')
+
     return get_user
 
 
 def none_to_empty(element):
-        """
+    """
         Convert a data element to an empty string if it is None.
 
         :param element: element to convert.
         :return: an empty string if element is None, else, the element as is.
         """
-        if element is None:
-            return ''
-        else:
-            return element
+    if element is None:
+        return ''
+    else:
+        return element
 
 
-def json_to_list(json_data, get_user):
+def json_to_list(json_data, get_user, include_relations_):
     """
     Convert a json of Bitbucket issues to Redmine CSV.
 
     :param json_data: the json dict / list
     :param get_user: a function that converts usernames from Bitbucket to Redmine
+    :param include_relations_: if set to True, use the full header and fields for each column.
     :return: a dataset of row issues without header
     :rtype: list
     """
     dataset = []
+    if include_relations_:
+        header = ['Subject', 'Description', 'Assigned To', 'Fixed version', 'Author', 'Category', 'Priority', 'Tracker',
+                  'Status', 'Start date', 'Due date', 'Done Ratio', 'Estimated hours', 'Watchers', 'blocked by',
+                  'blocks',
+                  'duplicated by', 'duplicates', 'follows', 'precedes', 'related to', 'Parent Issue', 'Id']
+    else:
+        header = ['Subject', 'Description', 'Assigned To', 'Fixed version', 'Author', 'Category', 'Priority', 'Tracker',
+                  'Status', 'Start date', 'Due date', 'Done Ratio', 'Estimated hours', 'Watchers']
     for issue in json_data['issues']:
         watchers = ','.join(map(get_user, issue['watchers']))
-        new_row = [issue['title'], issue['content'], get_user(issue['assignee']), issue['version'],
-                   get_user(issue['reporter']), None, issue['priority'], issue['kind'], issue['status'],
-                   issue['created_on'], None, None, None, watchers, None, None, None, None, None,
-                   None, None, None, None]
+        kind = convert_kind(issue['kind'])
+        priority = convert_priority(issue['priority'])
+        status = convert_status(issue['status'])
+        if include_relations_:
+            new_row = [issue['title'], issue['content'], get_user(issue['assignee']), issue['version'],
+                       get_user(issue['reporter']), None, priority, kind, status,
+                       issue['created_on'], None, None, None, watchers, None, None, None, None, None,
+                       None, None, None, None]
+        else:
+            new_row = [issue['title'], issue['content'], get_user(issue['assignee']), issue['version'],
+                       get_user(issue['reporter']), None, priority, kind, status,
+                       issue['created_on'], None, None, None, watchers]
         unused_data = [issue['component'], issue['content_updated_on'], issue['edited_on'], issue['id'],
                        issue['milestone'], issue['updated_on'], issue['voters']]
         for comment in json_data['comments']:
@@ -100,26 +118,75 @@ def json_to_list(json_data, get_user):
         no_none_new_row = map(none_to_empty, new_row)
         encoded_new_row = [unicode(el).encode('utf-8') for el in no_none_new_row]
         dataset.append(encoded_new_row)
+    dataset.insert(0, header)
     return dataset
 
 
-def save_issues_csv(file_out_, header, dataset):
+def save_issues_csv(file_out_, dataset):
     """
     Write a CSV file with a header and a dataset (a list of lists).
 
     :param file_out_: path to file to write.
-    :param header: a list of elements to use as header in the CSV file.
-    :param dataset: a list of lists of elements, to use as the content of the CSV file.
+    :param dataset: a list of lists of elements, to use as the content of the CSV file, including a header.
     :return:
     """
     write_file = open(file_out_, 'w')
     csv_writer = csv.writer(write_file, lineterminator='\n')
-    csv_writer.writerow(header)
     csv_writer.writerows(dataset)
     write_file.close()
 
 
-def main(file_in_, file_out_, user_map_):
+def convert_priority(bitbucket_priority):
+    """
+    Convert a Bitbucket priority to a Redmine priority.
+
+    :param bitbucket_priority: string with the priority to convert.
+    :return: the new Redmine priority.
+    :rtype: str
+    """
+    items = {'trivial': 'Low',
+             'minor': 'Normal',
+             'major': 'High',
+             'critical': 'Urgent',
+             'blocker': 'Immediate'}
+    return items.get(bitbucket_priority, '')
+
+
+def convert_kind(bitbucket_kind):
+    """
+    Convert a Bitbucket Kind to a Redmine Tracker.
+
+    :param bitbucket_kind: string with the kind to convert.
+    :return: the new Redmine tracker.
+    :rtype: str
+    """
+    items = {'bug': 'Bug',
+             'enhancement': 'Feature',
+             'proposal': 'Feature',
+             'task': 'Task'}
+    return items.get(bitbucket_kind, '')
+
+
+def convert_status(bitbucket_status):
+    """
+    Convert a Bitbucket status to a Redmine status.
+
+    :param bitbucket_status: string with the status to convert.
+    :return: the new Redmine status.
+    :rtype: str
+    """
+    items = {'new': 'New',
+             'open': 'In Progress',
+             'on hold': 'New',
+             'resolved': 'Resolved',
+             'duplicate': 'Rejected',
+             'invalid': 'Rejected',
+             'wontfix': 'Rejected',
+             'closed': 'Closed'}
+    return items.get(bitbucket_status, '')
+
+
+def main(file_in_, file_out_, user_map_, include_relations_):
     """
     Main execution of the program, calling external functions.
 
@@ -130,11 +197,8 @@ def main(file_in_, file_out_, user_map_):
     """
     json_data = get_json_data(file_in_)
     get_user = get_user_dict_function(user_map_)
-    header = ['Subject', 'Description', 'Assigned To', 'Fixed version', 'Author', 'Category', 'Priority', 'Tracker',
-              'Status', 'Start date', 'Due date', 'Done Ratio', 'Estimated hours', 'Watchers', 'blocked by', 'blocks',
-              'duplicated by', 'duplicates', 'follows', 'precedes', 'related to', 'Parent Issue', 'Id']
-    dataset = json_to_list(json_data, get_user)
-    save_issues_csv(file_out_, header, dataset)
+    dataset = json_to_list(json_data, get_user, include_relations_)
+    save_issues_csv(file_out_, dataset)
 
 
 if __name__ == '__main__':
@@ -145,12 +209,14 @@ if __name__ == '__main__':
     parser.add_argument('file_out', help='a CSV file to write issues in Redmine Import format.')
     parser.add_argument('--user-map', help='a CSV file with two columns, one with a Bitbucket username and another with\
                         the corresponding Redmine username.')
-
+    parser.add_argument('--include-relations', help='set this flag if the output CSV should include relations between\
+                        issues (which is currently not implemented).', action='store_true')
     args = parser.parse_args()
 
     file_in = args.file_in
     file_out = args.file_out
     user_map = args.user_map
+    include_relations = args.include_relations
 
     # Main program
-    main(file_in, file_out, user_map)
+    main(file_in, file_out, user_map, include_relations)
